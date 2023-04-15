@@ -16,12 +16,32 @@ def main(message):
     bot.register_next_step_handler(msg, chatgpt)
 
 
+@bot.message_handler(commands=['help'])
+def send_help(message):
+    msg = bot.send_message(message.chat.id, "/reset - обнулить диалог")
+    bot.register_next_step_handler(msg, chatgpt)
+
+
+messages = [
+    {"role": "system", "content": "You’re a kind helpful assistant"}]
+
+
+@bot.message_handler(commands=['reset'])
+def reset(message):
+    msg = bot.send_message(message.chat.id, "***Диалог с ChatGPT обнулён***")
+    global messages
+    messages = [{"role": "system", "content": "You’re a kind helpful assistant"}]
+    bot.register_next_step_handler(msg, chatgpt)
+
+
 @bot.message_handler(content_types=['text'])
 def chatgpt(message):
     # Generate a response
+    messages.append({"role": "user", "content": message.text})
+
     completion = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": message.text}],
+        messages=messages,
         max_tokens=1024,
         n=1,
         stop=None,
@@ -29,6 +49,8 @@ def chatgpt(message):
 
     response = completion.choices[0].message.content
     bot.send_message(message.chat.id, response)
+    messages.append(
+        {"role": "assistant", "content": response})
 
 
 bot.polling(none_stop=True)
