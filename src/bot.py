@@ -1,7 +1,10 @@
+from time import sleep
+
 import openai
 import telebot
 import os
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Define OpenAI and telegram API keys
 load_dotenv()
@@ -39,18 +42,35 @@ def chatgpt(message):
     # Generate a response
     messages.append({"role": "user", "content": message.text})
 
-    completion = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=messages,
-        max_tokens=1024,
-        n=1,
-        stop=None,
-        temperature=0.7, )
+    try:
+        completion = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=1024,
+            n=1,
+            stop=None,
+            temperature=0.7, )
+        response = completion.choices[0].message.content
+        try:
+            bot.send_message(message.chat.id, response)
+        except ConnectionError:
+            print("***Сбой в работе интернет соединения.\n"
+                  "Повторяю запрос через ~5 секунд.***")
+            sleep(5)
+            bot.send_message(message.chat.id, response)
+        messages.append(
+            {"role": "assistant", "content": response})
+    except openai.error.InvalidRequestError as e:
+        bot.send_message(message.chat.id, f"***{e}\nКонтекст модели переполнен. Обнулите его с помощью команды "
+                                          f"\n/reset\n***")
+    except openai.error.APIConnectionError as e:
+        bot.send_message(message.chat.id, "***Сервер openai перегружен или не доступен в данный момент.\n"
+                                          "Повторите свой запрос заново.***")
 
-    response = completion.choices[0].message.content
-    bot.send_message(message.chat.id, response)
-    messages.append(
-        {"role": "assistant", "content": response})
+
+    now = datetime.now()
+    current_time = now.strftime("%H:%M:%S")
+    print("Successes at", current_time)
 
 
-bot.polling(none_stop=True)
+bot.infinity_polling()
